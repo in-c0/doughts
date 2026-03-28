@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ReactFlow, {
   addEdge,
   MiniMap,
@@ -15,38 +15,51 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 
-const ROOT = "D:/Projects/doughts/doughts/sample_templates/default";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openPath } from "@tauri-apps/plugin-shell";
 
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [root, setRoot] = useState<string | null>(null);
+
+  // 🔹 Pick folder
+  const pickFolder = async () => {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+    });
+
+    if (selected && typeof selected === "string") {
+      console.log("Picked:", selected);
+      setRoot(selected);
+    }
+  };
 
   // 🔹 Load folders → nodes
   useEffect(() => {
-    const loadFolders = async () => {
-        try {
-        const entries = await readDir(ROOT, { recursive: false });
+    if (!root) return;
 
-        console.log("ENTRIES:", entries); // 👈 ADD THIS
+    const loadFolders = async () => {
+      try {
+        const entries = await readDir(root, { recursive: false });
 
         const folders = entries
-            .filter((e) => e.isDirectory)
-            .map((folder, i) => ({
+          .filter((e) => e.isDirectory)
+          .map((folder, i) => ({
             id: folder.name!,
             data: { label: folder.name },
             position: { x: i * 250, y: 100 },
-            }));
-
-        console.log("FOLDERS:", folders); // 👈 ADD THIS
+          }));
 
         setNodes(folders);
-        } catch (err) {
+      } catch (err) {
         console.error("ERROR:", err);
-        }
+      }
     };
 
     loadFolders();
-    }, []);
+  }, [root]);
 
   // 🔹 Load edges
   useEffect(() => {
@@ -62,7 +75,7 @@ export default function App() {
     loadEdges();
   }, []);
 
-  // 🔹 Save edges when connecting
+  // 🔹 Save edges
   const onConnect = useCallback((params: any) => {
     setEdges((eds) => {
       const updated = addEdge(params, eds);
@@ -71,14 +84,46 @@ export default function App() {
     });
   }, []);
 
+  // 🔥 Open folder on node click
+  const onNodeClick = useCallback(
+    (_: any, node: any) => {
+      if (!root) return;
+
+      const fullPath = `${root}/${node.id}`;
+      console.log("Opening:", fullPath);
+
+      openPath(fullPath);
+    },
+    [root]
+  );
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
+      {/* UI overlay */}
+      <div
+        style={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          zIndex: 10,
+          background: "white",
+          padding: 10,
+          borderRadius: 8,
+        }}
+      >
+        <button onClick={pickFolder}>Select Folder</button>
+        <div style={{ marginTop: 8, fontSize: 12 }}>
+          {root || "No folder selected"}
+        </div>
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         fitView
       >
         <MiniMap />
