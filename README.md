@@ -12,12 +12,12 @@ Start with `npm install` and `npm run tauri dev`
 
 # Import dependency
 
-Tauri/Rust backend + React (Typescript) frontend
-Whenever you install:
-`npm install @tauri-apps/plugin-XYZ`
-
-
-ALSO run:
+Doughts uses Tauri/Rust backend + React (Typescript) frontend.
+Whenever you install an npm package:
+```
+npm install @tauri-apps/plugin-XYZ
+```
+Remember to ALSO run:
 ```
 cd src-tauri
 cargo add tauri-plugin-XYZ
