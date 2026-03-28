@@ -10,7 +10,7 @@ import ReactFlow, {
   Position,
   ConnectionMode,
   useStore,
-  MarkerType, // 👈 Added for the arrowheads
+  MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -25,7 +25,6 @@ import { Command } from "@tauri-apps/plugin-shell";
 
 /* ---------- Node (hidden handle) ---------- */
 const SingleHandleNode = ({ data }: any) => {
-  // Grab connection state to toggle pointer events
   const nodesConnectable = useStore((state) => state.nodesConnectable);
 
   return (
@@ -38,10 +37,9 @@ const SingleHandleNode = ({ data }: any) => {
         background: "#1e1e1e",
         color: "#fff",
         textAlign: "center",
-        overflow: "hidden", // 👈 Keeps the handle from overflowing the rounded corners
+        overflow: "hidden",
       }}
     >
-      {/* visible content */}
       <div>{data.label}</div>
 
       {/* FULL-NODE COVERAGE HANDLE */}
@@ -60,7 +58,6 @@ const SingleHandleNode = ({ data }: any) => {
           opacity: 0,
           minWidth: "auto",
           minHeight: "auto",
-          // Let clicks pass through to the node if we aren't connecting
           pointerEvents: nodesConnectable ? "all" : "none",
         }}
       />
@@ -69,7 +66,6 @@ const SingleHandleNode = ({ data }: any) => {
 };
 
 /* ---------- Node Types ---------- */
-// 👈 Moved outside the component to prevent unnecessary re-renders
 const nodeTypes = {
   single: SingleHandleNode,
 };
@@ -80,6 +76,10 @@ export default function App() {
   const [root, setRoot] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"pan" | "select" | "connect">("select");
+
+  // 👈 Markdown Panel State
+  const [activeNote, setActiveNote] = useState<string>("");
+  const [activeNode, setActiveNode] = useState<string | null>(null);
 
   /* ---------- Folder picker ---------- */
   const pickFolder = async () => {
@@ -106,7 +106,11 @@ export default function App() {
           .map((folder, i) => ({
             id: folder.name!,
             type: "single",
-            data: { label: folder.name },
+            data: {
+              label: folder.name,
+              path: `${root}/${folder.name}/note.md`, // 👈 Important: direct file path
+              folderPath: `${root}/${folder.name}`,   // 👈 Important: base folder path
+            },
             position: { x: i * 250, y: 100 },
           }));
 
@@ -142,112 +146,148 @@ export default function App() {
     });
   }, []);
 
-  /* ---------- Open folder ---------- */
-  const onNodeClick = useCallback(
-    async (_: any, node: any) => {
-      if (!root) return;
+  /* ---------- Open Note (Left Click) ---------- */
+  const onNodeClick = useCallback(async (_: any, node: any) => {
+    try {
+      const content = await readTextFile(node.data.path);
+      setActiveNote(content);
+      setActiveNode(node.id);
+    } catch (err) {
+      console.error("Failed to read markdown:", err);
+      setActiveNote("(no note.md found)");
+      setActiveNode(node.id); // 👈 Ensures the UI still updates to show the selected node
+    }
+  }, []);
 
-      const fullPath = `${root}/${node.id}`.replace(/\//g, "\\");
-
-      try {
-        await Command.create("explorer", [fullPath]).execute();
-      } catch (err) {
-        console.error(err);
-      }
-    },
-    [root]
-  );
+  /* ---------- Open Folder (Right Click) ---------- */
+  const onNodeContextMenu = useCallback(async (e: any, node: any) => {
+    e.preventDefault();
+    const fullPath = node.data.folderPath.replace(/\//g, "\\");
+    
+    try {
+      await Command.create("explorer", [fullPath]).execute();
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   return (
-    <div
-      style={{
-        width: "100vw",
-        height: "100vh",
-        cursor:
-          mode === "pan"
-            ? "grab"
-            : mode === "connect"
-            ? "crosshair"
-            : "default",
-      }}
-    >
-      {/* ---------- UI ---------- */}
+    // 👈 Split UI Container
+    <div style={{ display: "flex", width: "100vw", height: "100vh" }}>
+      
+      {/* 👈 LEFT: Graph Area */}
       <div
         style={{
-          position: "absolute",
-          top: 10,
-          left: 10,
-          zIndex: 10,
-          background: "#1e1e1e",
-          color: "#fff",
-          padding: 10,
-          borderRadius: 8,
+          flex: 1,
+          position: "relative",
+          cursor:
+            mode === "pan"
+              ? "grab"
+              : mode === "connect"
+              ? "crosshair"
+              : "default",
         }}
       >
-        <button onClick={pickFolder}>Select Folder</button>
+        {/* UI Overlay */}
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            zIndex: 10,
+            background: "#1e1e1e",
+            color: "#fff",
+            padding: 10,
+            borderRadius: 8,
+          }}
+        >
+          <button onClick={pickFolder}>Select Folder</button>
 
-        <div style={{ marginTop: 8 }}>
-          {root || "No folder selected"}
+          <div style={{ marginTop: 8 }}>
+            {root || "No folder selected"}
+          </div>
+
+          {/* Mode buttons */}
+          <div style={{ marginTop: 10 }}>
+            {["pan", "select", "connect"].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m as any)}
+                style={{
+                  marginRight: 5,
+                  padding: "4px 8px",
+                  background: mode === m ? "#4cafef" : "#444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                }}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* mode buttons */}
-        <div style={{ marginTop: 10 }}>
-          {["pan", "select", "connect"].map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m as any)}
-              style={{
-                marginRight: 5,
-                padding: "4px 8px",
-                background: mode === m ? "#4cafef" : "#444",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
-            >
-              {m.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          
+          onNodeClick={onNodeClick}             // 👈 Left Click
+          onNodeContextMenu={onNodeContextMenu} // 👈 Right Click
+
+          nodesDraggable={mode === "select"}
+          elementsSelectable={mode === "select"}
+          nodesConnectable={mode === "connect"}
+
+          panOnDrag={mode === "pan"}
+          panOnScroll={true}
+
+          connectionMode={ConnectionMode.Loose}
+          connectionRadius={30}
+
+          defaultEdgeOptions={{ 
+            type: "smoothstep",
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              color: '#b1b1b7',
+            },
+          }}
+          fitView
+        >
+          <MiniMap />
+          <Controls />
+          <Background />
+        </ReactFlow>
       </div>
 
-      {/* ---------- Graph ---------- */}
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={onNodeClick}
-
-        nodesDraggable={mode === "select"}
-        elementsSelectable={mode === "select"}
-        nodesConnectable={mode === "connect"}
-
-        panOnDrag={mode === "pan"}
-        panOnScroll={true}
-
-        connectionMode={ConnectionMode.Loose}
-        connectionRadius={30}
-
-        // 👈 Added arrowheads to the default edge options
-        defaultEdgeOptions={{ 
-          type: "smoothstep",
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: '#b1b1b7',
-          },
+      {/* 👈 RIGHT: Markdown Viewer Panel */}
+      <div
+        style={{
+          width: "400px",
+          background: "#111",
+          color: "#fff",
+          padding: 16,
+          overflow: "auto",
+          borderLeft: "1px solid #333",
+          display: "flex",
+          flexDirection: "column",
         }}
-        fitView
       >
-        <MiniMap />
-        <Controls />
-        <Background />
-      </ReactFlow>
+        <h3 style={{ margin: "0 0 16px 0", borderBottom: "1px solid #333", paddingBottom: "8px" }}>
+          {activeNode ? `📝 ${activeNode}` : "No node selected"}
+        </h3>
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>
+          {activeNote || "Click a node to read its markdown content."}
+        </pre>
+      </div>
+
     </div>
   );
 }
