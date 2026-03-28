@@ -16,7 +16,8 @@ import {
 } from "@tauri-apps/plugin-fs";
 
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { open as openPath } from "@tauri-apps/plugin-shell";
+import { openPath, openUrl } from '@tauri-apps/plugin-opener';
+import { Command } from "@tauri-apps/plugin-shell";
 
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -85,18 +86,23 @@ export default function App() {
   }, []);
 
   // 🔥 Open folder on node click
-  const onNodeClick = useCallback(
-    (_: any, node: any) => {
+  
+    const onNodeClick = useCallback(
+    async (_: any, node: any) => {
         if (!root) return;
 
-        const fullPath = `${root}/${node.id}`.replace(/\\/g, "/");
+        const fullPath = `${root}/${node.id}`.replace(/\//g, "\\");
 
         console.log("Opening:", fullPath);
 
-        openPath(`file://${fullPath}`);
+        try {
+        await Command.create("explorer", [fullPath]).execute();
+        } catch (err) {
+        console.error("Open failed:", err);
+        }
     },
     [root]
-  );
+    );
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>

@@ -7,18 +7,26 @@
     "opener:default",
 
     "dialog:allow-open",
+    "opener:allow-reveal-item-in-dir",
+    "opener:allow-open-url",
+    "opener:allow-open-path",
+    
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "explorer",
+          "cmd": "explorer",
+          "args": true
+        }
+      ]
+    },
 
+    "fs:allow-write-text-file",
     "fs:allow-read-dir",
     "fs:allow-read-file",
     "fs:read-all",
 
-    "shell:allow-open",
-
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        "D:/Projects/doughts/doughts/**"
-      ]
-    }
+    "shell:allow-open"
   ]
 }
