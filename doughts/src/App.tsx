@@ -9,6 +9,8 @@ import ReactFlow, {
   Handle,
   Position,
   ConnectionMode,
+  useStore,
+  MarkerType, // 👈 Added for the arrowheads
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -21,32 +23,55 @@ import {
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Command } from "@tauri-apps/plugin-shell";
 
-/* ---------- Custom Node (ONE handle) ---------- */
+/* ---------- Node (hidden handle) ---------- */
 const SingleHandleNode = ({ data }: any) => {
+  // Grab connection state to toggle pointer events
+  const nodesConnectable = useStore((state) => state.nodesConnectable);
+
   return (
     <div
       style={{
+        position: "relative",
         padding: 10,
         border: "1px solid #888",
         borderRadius: 6,
         background: "#1e1e1e",
         color: "#fff",
-        position: "relative",
+        textAlign: "center",
+        overflow: "hidden", // 👈 Keeps the handle from overflowing the rounded corners
       }}
     >
-      {data.label}
+      {/* visible content */}
+      <div>{data.label}</div>
 
+      {/* FULL-NODE COVERAGE HANDLE */}
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Top}
         style={{
-          background: "#aaa",
-          width: 8,
-          height: 8,
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          transform: "none",
+          border: "none",
+          borderRadius: 0,
+          opacity: 0,
+          minWidth: "auto",
+          minHeight: "auto",
+          // Let clicks pass through to the node if we aren't connecting
+          pointerEvents: nodesConnectable ? "all" : "none",
         }}
       />
     </div>
   );
+};
+
+/* ---------- Node Types ---------- */
+// 👈 Moved outside the component to prevent unnecessary re-renders
+const nodeTypes = {
+  single: SingleHandleNode,
 };
 
 export default function App() {
@@ -54,12 +79,7 @@ export default function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [root, setRoot] = useState<string | null>(null);
 
-  // 🔥 optional mode system
   const [mode, setMode] = useState<"pan" | "select" | "connect">("select");
-
-  const nodeTypes = {
-    single: SingleHandleNode,
-  };
 
   /* ---------- Folder picker ---------- */
   const pickFolder = async () => {
@@ -115,8 +135,6 @@ export default function App() {
 
   /* ---------- Save edges ---------- */
   const onConnect = useCallback((params: any) => {
-    console.log("CONNECT:", params);
-
     setEdges((eds) => {
       const updated = addEdge(params, eds);
       writeTextFile("edges.json", JSON.stringify(updated));
@@ -141,7 +159,18 @@ export default function App() {
   );
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        cursor:
+          mode === "pan"
+            ? "grab"
+            : mode === "connect"
+            ? "crosshair"
+            : "default",
+      }}
+    >
       {/* ---------- UI ---------- */}
       <div
         style={{
@@ -157,13 +186,29 @@ export default function App() {
       >
         <button onClick={pickFolder}>Select Folder</button>
 
-        <div style={{ marginTop: 8 }}>{root || "No folder selected"}</div>
+        <div style={{ marginTop: 8 }}>
+          {root || "No folder selected"}
+        </div>
 
-        {/* Mode controls */}
+        {/* mode buttons */}
         <div style={{ marginTop: 10 }}>
-          <button onClick={() => setMode("pan")}>Pan</button>
-          <button onClick={() => setMode("select")}>Select</button>
-          <button onClick={() => setMode("connect")}>Connect</button>
+          {["pan", "select", "connect"].map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m as any)}
+              style={{
+                marginRight: 5,
+                padding: "4px 8px",
+                background: mode === m ? "#4cafef" : "#444",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
+            >
+              {m.toUpperCase()}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -177,7 +222,6 @@ export default function App() {
         onConnect={onConnect}
         onNodeClick={onNodeClick}
 
-        /* 🔥 interaction modes */
         nodesDraggable={mode === "select"}
         elementsSelectable={mode === "select"}
         nodesConnectable={mode === "connect"}
@@ -185,12 +229,20 @@ export default function App() {
         panOnDrag={mode === "pan"}
         panOnScroll={true}
 
-        /* 🔥 CRITICAL FIX */
         connectionMode={ConnectionMode.Loose}
-
-        fitView
-        defaultEdgeOptions={{ type: "smoothstep" }}
         connectionRadius={30}
+
+        // 👈 Added arrowheads to the default edge options
+        defaultEdgeOptions={{ 
+          type: "smoothstep",
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+            color: '#b1b1b7',
+          },
+        }}
+        fitView
       >
         <MiniMap />
         <Controls />
