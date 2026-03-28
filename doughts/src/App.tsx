@@ -87,12 +87,13 @@ export default function App() {
   // 🔥 Open folder on node click
   const onNodeClick = useCallback(
     (_: any, node: any) => {
-      if (!root) return;
+        if (!root) return;
 
-      const fullPath = `${root}/${node.id}`;
-      console.log("Opening:", fullPath);
+        const fullPath = `${root}/${node.id}`.replace(/\\/g, "/");
 
-      openPath(fullPath);
+        console.log("Opening:", fullPath);
+
+        openPath(`file://${fullPath}`);
     },
     [root]
   );
