@@ -103,18 +103,22 @@ export default function App() {
       {/* UI overlay */}
       <div
         style={{
-          position: "absolute",
-          top: 10,
-          left: 10,
-          zIndex: 10,
-          background: "white",
-          padding: 10,
-          borderRadius: 8,
+            position: "absolute",
+            top: 10,
+            left: 10,
+            zIndex: 10,
+            background: "#1e1e1e",
+            color: "#fff",
+            padding: 10,
+            borderRadius: 8,
+            maxWidth: 300,
+            fontSize: 12,
+            wordBreak: "break-all",
         }}
-      >
+        >
         <button onClick={pickFolder}>Select Folder</button>
-        <div style={{ marginTop: 8, fontSize: 12 }}>
-          {root || "No folder selected"}
+        <div style={{ marginTop: 8 }}>
+            {root || "No folder selected"}
         </div>
       </div>
 
